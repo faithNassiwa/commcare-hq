@@ -564,10 +564,10 @@ class TestReportMultipleAggregationsSQL(ConfigurableReportTestMixin, TestCase):
     @classmethod
     def _create_data(cls):
         for row in [
-            {"state": "MA", "city": "Boston", "number": 4, "date": "2018-01-03"},
-            {"state": "MA", "city": "Boston", "number": 3, "date": "2018-02-18"},
-            {"state": "MA", "city": "Cambridge", "number": 2, "date": "2018-01-22"},
-            {"state": "TN", "city": "Nashville", "number": 1, "date": "2017-01-03"},
+            {"state": "MA", "city": "Boston", "number": 4, "age_at_registration": 1, "date": "2018-01-03"},
+            {"state": "MA", "city": "Boston", "number": 3, "age_at_registration": 5, "date": "2018-02-18"},
+            {"state": "MA", "city": "Cambridge", "number": 2, "age_at_registration": 8, "date": "2018-01-22"},
+            {"state": "TN", "city": "Nashville", "number": 1, "age_at_registration": 14, "date": "2017-01-03"},
         ]:
             cls._new_case(row).save()
 
@@ -615,6 +615,15 @@ class TestReportMultipleAggregationsSQL(ConfigurableReportTestMixin, TestCase):
                         "property_name": 'number'
                     },
                     "column_id": 'indicator_col_id_number',
+                    "datatype": "integer"
+                },
+                {
+                    "type": "expression",
+                    "expression": {
+                        "type": "property_name",
+                        "property_name": 'age_at_registration'
+                    },
+                    "column_id": 'age_at_registration',
                     "datatype": "integer"
                 },
                 {
@@ -791,4 +800,47 @@ class TestReportMultipleAggregationsSQL(ConfigurableReportTestMixin, TestCase):
                ['MA', '2018-01', 6],
                ['MA', '2018-02', 3],
                ['TN', '2017-01', 1]]]]
+        )
+
+    def test_aggregate_by_range(self):
+        report_config = self._create_report(
+            aggregation_columns=[
+                'indicator_col_id_state',
+                'age_range',
+            ],
+            columns=[
+                {
+                    'type': 'field',
+                    'display': 'report_column_display_state',
+                    'field': 'indicator_col_id_state',
+                    'column_id': 'report_column_col_id_state',
+                    'aggregation': 'simple'
+                },
+                {
+                    'type': 'aggregate_range',
+                    'display': 'age_range',
+                    'field': 'age_at_registration',
+                    'column_id': 'age_range',
+                    'aggregation': 'simple',
+                    # TODO add a param for specifying range buckets
+                    # 0-6, 6-12, 12+, call them 1, 2, 3
+                },
+                {
+                    'type': 'field',
+                    'display': 'report_column_display_number',
+                    'field': 'indicator_col_id_number',
+                    'column_id': 'report_column_col_id_number',
+                    'aggregation': 'sum'
+                }
+            ],
+            filters=None,
+        )
+        view = self._create_view(report_config)
+        self.assertEqual(
+            view.export_table,
+            [['foo',
+              [['state', 'age_range', 'report_column_display_number'],
+               ['MA', '1', '7'],
+               ['MA', '2', '2'],
+               ['TN', '3', '1']]]]
         )

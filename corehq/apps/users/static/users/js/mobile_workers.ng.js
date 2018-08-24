@@ -236,7 +236,6 @@
                     generateStrongPasswords: generateStrongPasswords,
                 });
             }
-            hqImport('analytix/js/google').track.event('Manage Mobile Workers', 'New Mobile Worker', '');
         };
 
         $scope.submitNewMobileWorker = function () {

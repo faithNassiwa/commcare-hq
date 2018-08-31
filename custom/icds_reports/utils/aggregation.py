@@ -960,6 +960,8 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
         age_in_months = "(({} - child_health.dob) / 30.4 )".format(start_month_string)
         open_in_month = ("(({} - child_health.opened_on::date)::integer >= 0) AND (child_health.closed = 0 OR (child_health.closed_on::date - {})::integer > 0)").format(end_month_string, start_month_string)
         alive_in_month = "(child_health.date_death IS NULL OR child_health.date_death - {} >= 0)".format(start_month_string)
+        born_in_month = "(child_health.dob BETWEEN {} AND {})".format(start_month_string, end_month_string)
+        seeking_services = "(child_health.is_availing = 1 AND child_health.is_migrated = 0)"
 
         columns = (
             ("awc_id", "child_health.awc_id"),
@@ -984,7 +986,7 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
             ("age_in_months", 'trunc({})'.format(age_in_months_end)),
             ("open_in_month", "CASE WHEN {} THEN 1 ELSE 0 END".format(open_in_month)),
             ("alive_in_month", "CASE WHEN {} THEN 1 ELSE 0 END".format(alive_in_month)),
-            ("born_in_month", "ucr.born_in_month"),
+            ("born_in_month", "CASE WHEN {} AND {} THEN 1 ELSE 0 END".format(born_in_month, seeking_services)),
             ("bf_at_birth_born_in_month", "ucr.bf_at_birth_born_in_month"),
             ("fully_immunized_eligible", "ucr.fully_immunized_eligible"),
             ("fully_immunized_on_time", "ucr.fully_immunized_on_time"),

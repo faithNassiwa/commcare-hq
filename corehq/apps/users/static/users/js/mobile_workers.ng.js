@@ -90,22 +90,6 @@
         },
     };
 
-    var STATUS = {
-        NEW: 'new',
-        PENDING: 'pending',
-        WARNING: 'warning',
-        SUCCESS: 'success',
-        RETRIED: 'retried',
-    };
-
-    var USERNAME_STATUS = {
-        PENDING: 'pending',
-        TAKEN: 'taken',
-        AVAILABLE: 'available',
-        AVAILABLE_WARNING: 'warning',
-        ERROR: 'error', 
-    };
-
     mobileWorkers.constant('customFields', []);
     mobileWorkers.constant('customFieldNames', []);
     mobileWorkers.constant('location_url', '');
@@ -187,7 +171,7 @@
     var mobileWorkerControllers = {};
 
     mobileWorkerControllers.MobileWorkerCreationController = function (
-        $scope, workerCreationFactory, djangoRMI, customFields,
+        $scope, djangoRMI, customFields,
         customFieldNames, generateStrongPasswords, location_url, $http
     ) {
         $scope._ = _;  // make underscore available
@@ -238,53 +222,12 @@
             }
         };
 
-        $scope.submitNewMobileWorker = function () {
-            $("#newMobileWorkerModal").modal('hide');
-            $scope.workers.push($scope.mobileWorker);
-            workerCreationFactory.stageNewMobileWorker($scope.mobileWorker);
-        };
-
         $scope.retryMobileWorker = function (worker) {
             $scope.initializeMobileWorker(worker);
             $scope.usernameAvailabilityStatus = USERNAME_STATUS.AVAILABLE;
             $scope.usernameStatusMessage = gettext('Username is available.');
             $scope.markNonDefault();
         };
-    };
-
-    var mobileWorkerFactories = {};
-    mobileWorkerFactories.workerCreationFactory = function ($q, djangoRMI) {
-        var self = {};
-
-        self.stageNewMobileWorker = function (newWorker) {
-            newWorker.creationStatus = STATUS.PENDING;
-            var deferred = $q.defer();
-            if(typeof(hex_parser) !== 'undefined') {
-                newWorker.password = (new hex_parser()).encode(newWorker.password);
-            }
-            djangoRMI.create_mobile_worker({
-                mobileWorker: newWorker, 
-            })
-                .success(function (data) {
-                    if (data.success) {
-                        newWorker.creationStatus = STATUS.SUCCESS;
-                        newWorker.editUrl = data.editUrl;
-                        deferred.resolve(data);
-                    } else {
-                        newWorker.creationStatus = STATUS.WARNING;
-                        deferred.reject(data);
-                    }
-                })
-                .error(function () {
-                    newWorker.creationStatus = STATUS.WARNING;
-                    deferred.reject(
-                        gettext("Sorry, there was an issue communicating with the server.")
-                    );
-                });
-
-            return deferred.promise;
-        };
-        return self;
     };
 
     var mobileWorkerDirectives = {};

@@ -21,7 +21,9 @@
 {% if implement_password_obfuscation %}
 {% include "nic_compliance/password_encoder.html" %}{# TODO: don't break this #}
 {% endif %}
-<script src="{% static 'users/js/mobile_workers.js' %}"></script>
+<script src="{% static 'users/js/mobile_worker_models.js' %}"></script>
+<script src="{% static 'users/js/mobile_worker_creation_models.js' %}"></script>
+<script src="{% static 'users/js/mobile_workers_main.js' %}"></script>
 {% endblock %}
 
 {% block page_content %}

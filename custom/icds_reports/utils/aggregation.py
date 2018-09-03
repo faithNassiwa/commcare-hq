@@ -1067,7 +1067,7 @@ class ChildHealthMonthlyAggregationHelper(BaseICDSAggregationHelper):
                 "ELSE 'unweighed' END".format(wer_eligible)),
             ("nutrition_status_weighed",
                 "CASE "
-                "WHEN {} AND current_month_nutrition_status != 'unweighed' THEN 1 "
+                "WHEN {} AND date_trunc('MONTH', gm.zscore_grading_wfa_last_recorded) != %(start_date)s THEN 1 "
                 "ELSE 0 END".format(wer_eligible)),
             ("recorded_weight",
                 "CASE "

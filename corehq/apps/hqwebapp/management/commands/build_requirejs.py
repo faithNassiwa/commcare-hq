@@ -65,8 +65,8 @@ class Command(ResourceStaticCommand):
                             dirs[directory].add(main)
 
 
-            # For each directory, write a no-op js file that depends on all of the main modules in that dir.
-            # r.js will overwrite each of these files with an optimized bundle of these main modules and all their
+            # For each directory, add an optimized "module" entry including all of the main modules in that dir.
+            # For each of these entries, r.js will create an optimized bundle of these main modules and all their
             # dependencies
             for directory, mains in dirs.items():
                 config['modules'].append({

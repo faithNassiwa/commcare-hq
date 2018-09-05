@@ -1,6 +1,7 @@
 from __future__ import absolute_import, print_function
 from __future__ import unicode_literals
 import json
+import logging
 import os
 import re
 import six
@@ -8,10 +9,15 @@ import subprocess
 import yaml
 from django.contrib.staticfiles import finders
 from django.conf import settings
+from shutil import copyfile
 from subprocess import call
 
 from corehq.apps.hqwebapp.management.commands.resource_static import Command as ResourceStaticCommand
 from io import open
+
+
+logger = logging.getLogger('build_requirejs')
+logger.setLevel('DEBUG')
 
 
 class Command(ResourceStaticCommand):
@@ -22,7 +28,38 @@ class Command(ResourceStaticCommand):
 
     root_dir = settings.FILEPATH
 
+    def add_arguments(self, parser):
+        parser.add_argument('--local', action='store_true',
+            help='Running on a local environment. Copies generated files back into corehq. Allows you to mimic '
+                 'production optimization (dependency tracing, concatenation and minification) locally. '
+                 'Does not allow you to mimic CDN.')
+        parser.add_argument('--no_optimize', action='store_true',
+            help='Don\'t minify files. Useful when running on a local environment.')
+
     def handle(self, **options):
+        local = options['local']
+        no_optimize = options['no_optimize']
+
+        def _relative(path):
+            rel = path.replace(self.root_dir, '')
+            if rel.startswith("/"):
+                rel = rel[1:]
+            return rel
+
+        if local:
+            proc = subprocess.Popen(["git", "diff-files", "--ignore-submodules", "--name-only"], stdout=subprocess.PIPE)
+            (out, err) = proc.communicate()
+            if out:
+                confirm = raw_input("You have unstaged changes to the following files: \n{} "
+                                    "This script overwrites some static files. "
+                                    "Are you sure you want to continue (y/n)? ".format(out))
+                if confirm[0].lower() != 'y':
+                    exit()
+            confirm = raw_input("You are running locally. Have you already run "
+                                "`./manage.py collectstatic --noinput && ./manage.py compilejsi18n` (y/n)? ")
+            if confirm[0].lower() != 'y':
+                exit()
+
         try:
             from resource_versions import resource_versions
         except (ImportError, SyntaxError):
@@ -32,8 +69,11 @@ class Command(ResourceStaticCommand):
         with open(os.path.join(self.root_dir, 'staticfiles', 'hqwebapp', 'yaml', 'requirejs.yaml'), 'r') as f:
             config = yaml.load(f)
 
+            if no_optimize:
+                config['optimize'] = 'none'
+
             # Find all HTML files in corehq, excluding partials
-            prefix = os.path.join(os.getcwd(), 'corehq')
+            prefix = os.path.join(self.root_dir, 'corehq')
             html_files = []
             for root, dirs, files in os.walk(prefix):
                 for name in files:
@@ -59,7 +99,7 @@ class Command(ResourceStaticCommand):
                     if match:
                         main = match.group(1)
                         directory = match.group(2)
-                        if os.path.exists(os.path.join(os.getcwd(), 'staticfiles', main + '.js')):
+                        if os.path.exists(os.path.join(self.root_dir, 'staticfiles', main + '.js')):
                             if directory not in dirs:
                                 dirs.update({directory: set()})
                             dirs[directory].add(main)
@@ -82,9 +122,26 @@ class Command(ResourceStaticCommand):
 
         # Run r.js
         call(["node", "bower_components/r.js/dist/r.js", "-o", "staticfiles/build.js"])
+        if local:
+            for module in config['modules']:
+                src = os.path.join(self.root_dir, 'staticfiles', module['name'] + '.js')
+                app = re.sub(r'/.*', '', module['name'])
+                dest = os.path.join(self.root_dir, 'corehq', 'apps', app, 'static', module['name'] + '.js')
+                dest_dir = re.sub(r'/[^/]*$', '', dest)
+                if os.path.exists(dest_dir):
+                    copyfile(src, dest)
+                else:
+                    logger.warning("Could not copy {} into {}".format(_relative(src), _relative(dest)))
+            logger.info("Final build config written to staticfiles/build.js")
+            logger.info("Bundle config output written to staticfiles/build.txt")
 
         filename = os.path.join(self.root_dir, 'staticfiles', 'hqwebapp', 'js', 'requirejs_config.js')
         resource_versions["hqwebapp/js/requirejs_config.js"] = self.get_hash(filename)
+        if local:
+            dest = os.path.join(self.root_dir, 'corehq', 'apps', 'hqwebapp', 'static',
+                                'hqwebapp', 'js', 'requirejs_config.js')
+            copyfile(filename, dest)
+            logger.info("Copied updated requirejs_config.js back into {}".format(_relative(dest)))
 
         # Overwrite each bundle in resource_versions with the sha from the optimized version in staticfiles
         for module in config['modules']:
@@ -100,7 +157,7 @@ class Command(ResourceStaticCommand):
                 lines = fin.readlines()
             with open(filename, 'w') as fout:
                 for line in lines:
-                    if re.search(r'sourceMappingURL=bundle.js.map', line):
+                    if re.search(r'sourceMappingURL=bundle.js.map$', line):
                         line = re.sub(r'bundle.js.map', 'bundle.js.map?version=' + file_hash, line)
                     fout.write(line)
             resource_versions[module['name'] + ".js"] = file_hash

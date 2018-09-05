@@ -21,7 +21,7 @@ requirejs.config({
             deps: ['jquery', 'knockout', 'underscore'],
             exports: 'RMI',
         },
-        "stripe": {
+        "accounting/js/lib/stripe": {
             exports: 'Stripe',
         },
     },
